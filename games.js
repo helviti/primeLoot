@@ -1,4 +1,7 @@
 export const games = [
-  { name: "league", url: "https://gaming.amazon.com/loot/lol10" },
-  { name: "genshin", url: "https://gaming.amazon.com/loot/genshinimpact" },
+  { name: "League of Legends", url: "https://gaming.amazon.com/loot/lol10" },
+  {
+    name: "Genshin Impact",
+    url: "https://gaming.amazon.com/loot/genshinimpact",
+  },
 ];

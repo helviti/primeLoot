@@ -2,68 +2,96 @@ import puppeteer from "puppeteer";
 import { games } from "./games.js";
 import fs from "fs";
 
-const scrapedLoot = [];
-
-async function scrapeLoot(game) {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto(game.url, {
-    waitUntil: "networkidle0",
-  });
-  await page.waitForSelector(".loot-cards");
-
-  const data = await page.evaluate(() => {
-    const lootcard = document.querySelector(
-      ".loot-card__container:nth-child(1)"
-    );
-    const img = lootcard.querySelector("img").src;
-    const claim = lootcard.querySelector(
-      "span[data-a-target=tw-button-text]"
-    ).textContent;
-    const title = lootcard.querySelector(
-      "h2[data-test-selector=LootCardTitle]"
-    ).textContent;
-    const main = lootcard.querySelector(
-      "h3[data-test-selector=LootCardSubtitle]"
-    ).textContent;
-
-    return { main, img, claim, title };
-  });
-
-  scrapedLoot.push({ name: game.name, ...data, date: Date.now() });
-
-  await browser.close();
-}
-
 async function main() {
+  const responses = [];
+  const availableOffers = [];
   let savedLoot;
+
   fs.readFile("savedLoot.json", "utf8", (err, data) => {
     if (data) {
       savedLoot = JSON.parse(data);
-      console.log(savedLoot);
     }
   });
 
+  class Game {
+    constructor(name) {
+      this.name = name;
+      this.offers = [];
+    }
+  }
+
+  class Offer {
+    constructor(id, startTime, endTime, subtitle, img, content) {
+      this.id = id;
+      this.startTime = startTime;
+      this.endTime = endTime;
+      this.subtitle = subtitle;
+      this.img = img;
+      this.content = Array.from(content.map((item) => item.alt));
+    }
+  }
+
   for (const game of games) {
-    await scrapeLoot(game);
+    availableOffers.push(new Game(game.name));
   }
 
-  if (savedLoot) {
-    for (const game of savedLoot) {
-      console.log(`${game.name} found`);
+  try {
+    const browser = await puppeteer.launch({ headless: true });
+    const page = await browser.newPage();
+
+    page.on("response", async (response) => {
+      if (
+        response.request().url().includes("nonce") &&
+        JSON.parse(response.request().postData()).operationName ===
+          "OfferDetail_Journey"
+      ) {
+        responses.push(JSON.parse(await response.text()).data.journey);
+      }
+    });
+
+    async function scrapeLoot(game) {
+      await page.goto(game.url, {
+        waitUntil: "networkidle0",
+      });
     }
+
+    for (const game of games) {
+      await scrapeLoot(game);
+    }
+
+    await browser.close();
+
+    for (const response of responses) {
+      for (const offer of response.offers) {
+        if (offer.self.claimStatus === "AVAILABLE") {
+          availableOffers[
+            availableOffers.findIndex((el) => el.name === response.assets.title)
+          ].offers.push(
+            new Offer(
+              offer.id,
+              offer.startTime,
+              offer.endTime,
+              offer.assets.subtitle,
+              offer.assets.card.defaultMedia.src1x,
+              offer.assets.additionalMedia
+            )
+          );
+        }
+      }
+    }
+
+    console.log(`Available offers: ${availableOffers.length}`);
+
+    fs.writeFile(
+      "savedLoot.json",
+      JSON.stringify(availableOffers, null, 4),
+      (err) => {
+        console.log("Saved scraped loot");
+      }
+    );
+  } catch (err) {
+    console.log(err);
   }
-
-  // save to file
-  fs.writeFile(
-    "savedLoot.json",
-    JSON.stringify(scrapedLoot, null, 4),
-    (err) => {
-      console.log("Saved scraped loot");
-    }
-  );
-
-  console.log(JSON.stringify(scrapedLoot));
 }
 
 main();
