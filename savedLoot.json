@@ -1,0 +1,18 @@
+[
+    {
+        "name": "league",
+        "main": "Prime Gaming Kapsülü",
+        "img": "https://m.media-amazon.com/images/G/01/sm/amped/lol10/loot1_sm_1x._CB640512329_.jpg",
+        "claim": "Şimdi talep et",
+        "title": "Oyun içi içerik",
+        "date": 1639159123608
+    },
+    {
+        "name": "genshin",
+        "main": "Prime Gaming Paketi #7",
+        "img": "https://m.media-amazon.com/images/G/01/sm/GenshinImpact_S01/Drop07/loot7_sm_1x._CB654303121_.jpg",
+        "claim": "Şimdi talep et",
+        "title": "Oyun İçi İçerik",
+        "date": 1639159127705
+    }
+]
