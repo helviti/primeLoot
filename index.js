@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { games } from "./games.js";
+import { urls } from "./config.js";
 import fs from "fs";
 
 async function main() {
@@ -33,8 +33,8 @@ async function main() {
       }
     });
 
-    for (const game of games) {
-      await page.goto(game.url, {
+    for (const url of urls) {
+      await page.goto(url, {
         waitUntil: "networkidle0",
       });
     }
