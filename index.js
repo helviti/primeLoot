@@ -5,34 +5,18 @@ import fs from "fs";
 async function main() {
   const responses = [];
   const availableOffers = [];
-  let savedLoot;
-
-  fs.readFile("savedLoot.json", "utf8", (err, data) => {
-    if (data) {
-      savedLoot = JSON.parse(data);
-    }
-  });
-
-  class Game {
-    constructor(name) {
-      this.name = name;
-      this.offers = [];
-    }
-  }
 
   class Offer {
-    constructor(id, startTime, endTime, subtitle, img, content) {
+    constructor(id, game, startTime, endTime, subtitle, img, content) {
       this.id = id;
+      this.game = game;
       this.startTime = startTime;
       this.endTime = endTime;
       this.subtitle = subtitle;
       this.img = img;
-      this.content = Array.from(content.map((item) => item.alt));
+      this.content =
+        content.length === 0 ? [] : Array.from(content.map((item) => item.alt));
     }
-  }
-
-  for (const game of games) {
-    availableOffers.push(new Game(game.name));
   }
 
   try {
@@ -49,14 +33,10 @@ async function main() {
       }
     });
 
-    async function scrapeLoot(game) {
+    for (const game of games) {
       await page.goto(game.url, {
         waitUntil: "networkidle0",
       });
-    }
-
-    for (const game of games) {
-      await scrapeLoot(game);
     }
 
     await browser.close();
@@ -64,11 +44,10 @@ async function main() {
     for (const response of responses) {
       for (const offer of response.offers) {
         if (offer.self.claimStatus === "AVAILABLE") {
-          availableOffers[
-            availableOffers.findIndex((el) => el.name === response.assets.title)
-          ].offers.push(
+          availableOffers.push(
             new Offer(
               offer.id,
+              response.assets.title,
               offer.startTime,
               offer.endTime,
               offer.assets.subtitle,
@@ -81,6 +60,29 @@ async function main() {
     }
 
     console.log(`Available offers: ${availableOffers.length}`);
+
+    // Compare to saved file
+    let savedLoot;
+
+    try {
+      savedLoot = JSON.parse(fs.readFileSync("savedLoot.json", "utf8"));
+    } catch (err) {
+      console.error(err);
+    }
+
+    if (savedLoot) {
+      for (const offer of availableOffers) {
+        if (!savedLoot.map((el) => el.id).includes(offer.id)) {
+        } else {
+          console.log(offer);
+        }
+      }
+    } else {
+      console.log("No saved loot found");
+      for (const offer of availableOffers) {
+        console.log(offer);
+      }
+    }
 
     fs.writeFile(
       "savedLoot.json",
