@@ -1,38 +1,39 @@
-import puppeteer from "puppeteer";
-import { urls } from "./config.js";
-import fs from "fs";
+const puppeteer = require("puppeteer");
+const { urls } = require("./config.js");
+const fs = require("fs");
+
+class Offer {
+  constructor(id, game, startTime, endTime, subtitle, img, content) {
+    this.id = id;
+    this.game = game;
+    this.startTime = startTime;
+    this.endTime = endTime;
+    this.subtitle = subtitle;
+    this.img = img;
+    this.content =
+      content.length === 0 ? [] : Array.from(content.map((item) => item.alt));
+  }
+}
 
 async function main() {
+  const newLoot = [];
   const responses = [];
   const availableOffers = [];
 
-  class Offer {
-    constructor(id, game, startTime, endTime, subtitle, img, content) {
-      this.id = id;
-      this.game = game;
-      this.startTime = startTime;
-      this.endTime = endTime;
-      this.subtitle = subtitle;
-      this.img = img;
-      this.content =
-        content.length === 0 ? [] : Array.from(content.map((item) => item.alt));
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+
+  page.on("response", async (response) => {
+    if (
+      response.request().url().includes("nonce") &&
+      JSON.parse(response.request().postData()).operationName ===
+        "OfferDetail_Journey"
+    ) {
+      responses.push(JSON.parse(await response.text()).data.journey);
     }
-  }
+  });
 
   try {
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-
-    page.on("response", async (response) => {
-      if (
-        response.request().url().includes("nonce") &&
-        JSON.parse(response.request().postData()).operationName ===
-          "OfferDetail_Journey"
-      ) {
-        responses.push(JSON.parse(await response.text()).data.journey);
-      }
-    });
-
     for (const url of urls) {
       await page.goto(url, {
         waitUntil: "networkidle0",
@@ -59,13 +60,17 @@ async function main() {
       }
     }
 
-    console.log(`Available offers: ${availableOffers.length}`);
-
     // Compare to saved file
     let savedLoot;
 
     try {
-      savedLoot = JSON.parse(fs.readFileSync("savedLoot.json", "utf8"));
+      if (fs.existsSync("savedLoot.json")) {
+        try {
+          savedLoot = JSON.parse(fs.readFileSync("savedLoot.json", "utf8"));
+        } catch (err) {
+          console.error(err);
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -73,14 +78,13 @@ async function main() {
     if (savedLoot) {
       for (const offer of availableOffers) {
         if (!savedLoot.map((el) => el.id).includes(offer.id)) {
-        } else {
-          console.log(offer);
+          newLoot.push(offer);
         }
       }
     } else {
       console.log("No saved loot found");
       for (const offer of availableOffers) {
-        console.log(offer);
+        newLoot.push(offer);
       }
     }
 
@@ -94,6 +98,10 @@ async function main() {
   } catch (err) {
     console.log(err);
   }
+  console.log(`${newLoot.length} new offers`);
+  return newLoot;
 }
 
 main();
+
+module.exports.scrapeLoot = main;
