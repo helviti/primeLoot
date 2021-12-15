@@ -3,7 +3,7 @@ const { urls } = require("./config.js");
 const fs = require("fs");
 
 class Offer {
-  constructor(id, game, startTime, endTime, subtitle, img, content) {
+  constructor(id, game, startTime, endTime, subtitle, img, content, url) {
     this.id = id;
     this.game = game;
     this.startTime = startTime;
@@ -12,6 +12,14 @@ class Offer {
     this.img = img;
     this.content =
       content.length === 0 ? [] : Array.from(content.map((item) => item.alt));
+    this.url = url;
+  }
+}
+
+class Response {
+  constructor(url, data) {
+    this.url = url;
+    this.data = data;
   }
 }
 
@@ -29,7 +37,10 @@ async function main() {
       JSON.parse(response.request().postData()).operationName ===
         "OfferDetail_Journey"
     ) {
-      responses.push(JSON.parse(await response.text()).data.journey);
+      console.log(page.url());
+      responses.push(
+        new Response(page.url(), JSON.parse(await response.text()).data.journey)
+      );
     }
   });
 
@@ -43,17 +54,19 @@ async function main() {
     await browser.close();
 
     for (const response of responses) {
-      for (const offer of response.offers) {
+      console.log(response);
+      for (const offer of response.data.offers) {
         if (offer.self.claimStatus === "AVAILABLE") {
           availableOffers.push(
             new Offer(
               offer.id,
-              response.assets.title,
+              response.data.assets.title,
               offer.startTime,
               offer.endTime,
               offer.assets.subtitle,
               offer.assets.card.defaultMedia.src1x,
-              offer.assets.additionalMedia
+              offer.assets.additionalMedia,
+              response.url
             )
           );
         }
@@ -68,11 +81,11 @@ async function main() {
         try {
           savedLoot = JSON.parse(fs.readFileSync("savedLoot.json", "utf8"));
         } catch (err) {
-          console.error(err);
+          // console.error(err);
         }
       }
     } catch (err) {
-      console.error(err);
+      // console.error(err);
     }
 
     if (savedLoot) {
@@ -82,7 +95,7 @@ async function main() {
         }
       }
     } else {
-      console.log("No saved loot found");
+      // console.log("No saved loot found");
       for (const offer of availableOffers) {
         newLoot.push(offer);
       }
@@ -92,16 +105,15 @@ async function main() {
       "savedLoot.json",
       JSON.stringify(availableOffers, null, 4),
       (err) => {
-        console.log("Saved scraped loot");
+        // console.log("Saved scraped loot");
       }
     );
   } catch (err) {
     console.log(err);
   }
-  console.log(`${newLoot.length} new offers`);
-  return newLoot;
+  // console.log(`${newLoot.length} new offers`);
 }
 
 main();
 
-module.exports.scrapeLoot = main;
+module.exports = main;
